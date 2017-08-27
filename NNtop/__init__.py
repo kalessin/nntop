@@ -35,7 +35,7 @@ class Layer(object):
         return self.__op(X)
         
     def __op(self, X):
-        result = self.op()
+        result = self.op(X)
         if self.__activation == 'relu':
             result = tf.nn.relu(result, name="%s_relu" % self.name)
         elif self.__activation == 'sigmoid':
@@ -46,8 +46,7 @@ class Layer(object):
 
     def op(self, X):
         x = tf.reshape(X, [-1, self.__shape[0]], name="%s_reshape" % self.name)
-        result = tf.add(tf.matmul(x, self.__W, name="%s_mul" % self.__name), self.__b, name="%s_add" % self.name)
-        return self.apply_activation(result)
+        return tf.add(tf.matmul(x, self.__W, name="%s_mul" % self.__name), self.__b, name="%s_add" % self.name)
 
     def init_weight_variable(self, stddev=0.2):
         if self.__W is None:
