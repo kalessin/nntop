@@ -21,20 +21,7 @@ class Layer(object):
     def name(self):
         return self.__name
 
-    @property
-    def weights(self):
-        return self.__W
-    
-    @property
-    def bias_vector(self):
-        return self.__b
-
     def __call__(self, X):
-        self.init_weight_variable()
-        self.init_bias_variable()
-        return self.__op(X)
-        
-    def __op(self, X):
         result = self.op(X)
         if self.__activation == 'relu':
             result = tf.nn.relu(result, name="%s_relu" % self.name)
@@ -44,24 +31,36 @@ class Layer(object):
             result = tf.nn.tanh(result, name="%s_tanh" % self.name)
         return result
 
-    def op(self, X):
-        x = tf.reshape(X, [-1, self.__shape[0]], name="%s_reshape" % self.name)
-        return tf.add(tf.matmul(x, self.__W, name="%s_mul" % self.__name), self.__b, name="%s_add" % self.name)
-
-    def init_weight_variable(self, stddev=0.2):
-        if self.__W is None:
-            initial = tf.truncated_normal(self.__shape, stddev=stddev)
+    @property
+    def weights_matrix(self):
+        if self.__W is None and self.__shape is not None:
+            initial = tf.truncated_normal(self.__shape, stddev=0.2)
             self.__W = tf.Variable(initial, name='%s_W' % self.name)
+        return self.__W
 
-    def init_bias_variable(self):
-        if self.__b is None:
+    @property
+    def bias_vector(self):
+        if self.__b is None and self.__shape is not None:
             initial = tf.constant(0.1, shape=[self.__shape[-1]])
             self.__b = tf.Variable(initial, name='%s_b' % self.name)
+        return self.__b
+
+
+    def op(self, X):
+        # first convert to vector the input tensor, where only first dimension (number of samples) is conserved
+        input_shape = [-1, np.prod([s.value for s in X.shape[1:]])]
+        x = tf.reshape(X, input_shape, name="%s_reshape" % self.name)
+
+        if self.__shape[0] is None:
+            self.__shape = [input_shape[1], self.__shape[1]]
+
+        return tf.add(tf.matmul(x, self.weights_matrix, name="%s_mul" % self.__name), self.bias_vector, name="%s_add" % self.name)
 
 
 class Convolution(Layer):
     def __init__(self, name, img_shape, field_shape, strides_shape, filters, input_channels=1, padding='SAME', activation=None):
         """
+        img_shape - input img shape. If not None, input vector will be reshaped to the given shape.
         field_shape - field Height x field Width
         strides_shape - strides Height x strides Width
         filters - number of filters
@@ -75,9 +74,10 @@ class Convolution(Layer):
         self.__padding = padding
 
     def op(self, X):
-        x = tf.reshape(X, [-1, self.__img_shape[0], self.__img_shape[1], self.__input_channels],
-                       name="%s_reshape" % self.name)
-        return tf.add(tf.nn.conv2d(x, self.weights, strides=[1, self.__strides_shape[0], self.__strides_shape[1],
+        if self.__img_shape is not None:
+            X = tf.reshape(X, [-1, self.__img_shape[0], self.__img_shape[1], self.__input_channels],
+                           name="%s_reshape" % self.name)
+        return tf.add(tf.nn.conv2d(X, self.weights_matrix, strides=[1, self.__strides_shape[0], self.__strides_shape[1],
                                                              1],
                                    padding=self.__padding, name=self.name),
                       self.bias_vector, name="%s_add" % self.name)
