@@ -125,7 +125,7 @@ class Model(object):
         return self.__test_accuracy
     
     @property
-    def final_confusion_matrix(self):
+    def final_test_confusion_matrix(self):
         return self.__test_confusion_matrix
 
     def append(self, tensor_op):
