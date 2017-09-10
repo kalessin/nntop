@@ -16,7 +16,7 @@ class Layer(object):
     @property
     def shape(self):
         return self.__shape
-    
+
     @property
     def name(self):
         return self.__name
@@ -44,7 +44,6 @@ class Layer(object):
             initial = tf.constant(0.1, shape=[self.__shape[-1]])
             self.__b = tf.Variable(initial, name='%s_b' % self.name)
         return self.__b
-
 
     def op(self, X):
         # first convert to vector the input tensor, where only first dimension (number of samples) is conserved
@@ -78,7 +77,7 @@ class Convolution(Layer):
             X = tf.reshape(X, [-1, self.__img_shape[0], self.__img_shape[1], self.__input_channels],
                            name="%s_reshape" % self.name)
         return tf.add(tf.nn.conv2d(X, self.weights_matrix, strides=[1, self.__strides_shape[0], self.__strides_shape[1],
-                                                             1],
+                                                                    1],
                                    padding=self.__padding, name=self.name),
                       self.bias_vector, name="%s_add" % self.name)
 
@@ -92,25 +91,35 @@ class Relu(object):
 
 
 class Model(object):
-    def __init__(self, num_features, num_classes, name):
-        self.__X = self.__last = self.__y = None
-        self.__K = num_classes
+    def __init__(self, num_features, num_classes, name, graph=None):
+        self.__num_classes = num_classes
         self.__num_features = num_features
         self.__name = name
-        self.__graph = tf.Graph()
 
         self.__trained = False
         self.__train_loss = self.__valid_loss = None
-        
+
         self.__output = None
         self.__prediction = None
-        
+
+        self.__accuracy = self.__confusion_matrix = None
         self.__test_accuracy = None
         self.__test_confusion_matrix = None
-    
-    @property
-    def filename(self):
-        return "%s.ckpt" % self.__name
+
+        self.__graph = graph or tf.Graph()
+        with self.__graph.as_default():
+            if graph: # we are restoring model
+                self.__X = self.__graph.get_tensor_by_name("X:0")
+                self.__y = self.__graph.get_tensor_by_name("y:0")
+                self._compile(restore=True)
+            else: # we are creating a new model
+                self.__X = tf.placeholder(tf.float32, shape=[None, self.__num_features], name='X')
+                self.__y = tf.placeholder(tf.float32, shape=[None, self.__num_classes], name='y')
+
+                # just to save these initialization parameters
+                tf.constant(self.__num_classes, name="num_classes")
+                tf.constant(self.__num_features, name="num_features")
+                self.__last = self.__X
 
     @property
     def final_train_loss(self):
@@ -119,22 +128,19 @@ class Model(object):
     @property
     def final_validation_loss(self):
         return self.__valid_loss
-    
+
     @property
     def final_test_accuracy(self):
         return self.__test_accuracy
-    
+
     @property
     def final_test_confusion_matrix(self):
         return self.__test_confusion_matrix
 
     def append(self, tensor_op):
-        with self.__graph.as_default() as graph:
-            if self.__X is None:
-                self.__X = tf.placeholder(tf.float32, shape=[None, self.__num_features])
-                self.__last = self.__X
+        with self.__graph.as_default():
             self.__last = tensor_op(self.__last)
-    
+
     def train(self, batches, validation_set, test_set, steps, print_every=None):
         """
         batches - a generator that yields a tuple of two iterators on each next cycle: one for samples and another for the corresponding labels
@@ -147,19 +153,16 @@ class Model(object):
         if not self.__trained:
             with self.__graph.as_default():
                 batchX, batchY = next(batches)
-                num_classes = batchY.shape[1]
 
-                self.__output = tf.nn.softmax(self.__last)
-                self.__prediction = tf.argmax(self.__output, 1)
+                self._compile()
 
-                self.__y = tf.placeholder(tf.float32, shape=[None, num_classes])
                 loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.__y, logits=self.__last))
                 train_step = tf.train.AdamOptimizer(1e-4).minimize(loss)
 
                 labels = tf.argmax(self.__y, 1)
                 correct_prediction = tf.equal(self.__prediction, labels)
                 self.__accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-                self.__confusion_matrix = tf.confusion_matrix(labels, self.__prediction, num_classes)
+                self.__confusion_matrix = tf.confusion_matrix(labels, self.__prediction, self.__num_classes)
 
                 init = tf.global_variables_initializer()
                 with tf.Session(graph=self.__graph) as sess:
@@ -177,23 +180,37 @@ class Model(object):
                     print("Test accuracy: %g" % self.__test_accuracy)
 
                     self.__test_confusion_matrix = self.__confusion_matrix.eval(feed_dict={self.__X: test_set[0],
-                                                                                 self.__y: test_set[1]})
+                                                                                           self.__y: test_set[1]})
 
                     saver = tf.train.Saver()
-                    saver.save(sess, self.filename)
+                    saver.save(sess, self.__name)
             self.__trained = True
+
+    def _compile(self, restore=False):
+        if self.__output is None:
+            if restore:
+                self.__output = self.__graph.get_tensor_by_name("output:0")
+            else:
+                self.__output = tf.nn.softmax(self.__last, name="output")
+            self.__prediction = tf.argmax(self.__output, 1)
 
     def output(self, X):
         with self.__graph.as_default():
-            if self.__output is None:
-                self.__output = tf.nn.softmax(self.__last)
-                self.__prediction = tf.argmax(self.__output, 1)
-
             with tf.Session(graph=self.__graph) as sess:
                 saver = tf.train.Saver()
-                saver.restore(sess, self.filename)
+                saver.restore(sess, self.__name)
                 output, prediction = sess.run([self.__output, self.__prediction], feed_dict={self.__X: X})
                 return output, prediction
-    
+
     def prediction(self, X):
         return self.output(X)[1]
+
+    @classmethod
+    def restore_from_file(cls, name):
+        sess = tf.Session()
+        saver = tf.train.import_meta_graph('%s.meta' % name)
+        saver.restore(sess, name)
+        graph = tf.get_default_graph()
+        num_features = graph.get_tensor_by_name("num_features:0")
+        num_classes = graph.get_tensor_by_name("num_classes:0")
+        return cls(num_features, num_classes, name, graph)
