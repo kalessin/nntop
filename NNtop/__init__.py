@@ -94,7 +94,17 @@ class Relu(object):
 
 
 class Model(object):
-    def __init__(self, num_features, num_classes, name, graph=None):
+    def __init__(self, name, num_features, num_classes):
+        graph = None
+        if num_features is None or num_classes is None: # restore model mode
+            sess = tf.Session()
+            saver = tf.train.import_meta_graph('%s.meta' % name)
+            saver.restore(sess, name)
+            graph = tf.get_default_graph()
+            num_features = graph.get_tensor_by_name("num_features:0")
+            num_classes = graph.get_tensor_by_name("num_classes:0")
+            self.__last_name = str(sess.run(["last_name:0"])[0].decode())
+
         self.__num_classes = num_classes
         self.__num_features = num_features
         self.__name = name
@@ -114,6 +124,7 @@ class Model(object):
             if graph: # we are restoring model
                 self.__X = self.__graph.get_tensor_by_name("X:0")
                 self.__y = self.__graph.get_tensor_by_name("y:0")
+                self.__last = self.__graph.get_tensor_by_name(self.__last_name)
                 self._compile(restore=True)
             else: # we are creating a new model
                 self.__X = tf.placeholder(tf.float32, shape=[None, self.__num_features], name='X')
@@ -123,6 +134,7 @@ class Model(object):
                 tf.constant(self.__num_classes, name="num_classes")
                 tf.constant(self.__num_features, name="num_features")
                 self.__last = self.__X
+                self.__last_name = self.__last.name
 
     @property
     def final_train_loss(self):
@@ -143,6 +155,7 @@ class Model(object):
     def append(self, tensor_op):
         with self.__graph.as_default():
             self.__last = tensor_op(self.__last)
+            self.__last_name = self.__last.name
 
     def train(self, batches, validation_set, test_set, steps, print_every=None):
         """
@@ -194,6 +207,7 @@ class Model(object):
             if restore:
                 self.__output = self.__graph.get_tensor_by_name("output:0")
             else:
+                tf.Variable(self.__last_name, name="last_name")
                 self.__output = tf.nn.softmax(self.__last, name="output")
             self.__prediction = tf.argmax(self.__output, 1)
 
@@ -207,13 +221,3 @@ class Model(object):
 
     def prediction(self, X):
         return self.output(X)[1]
-
-    @classmethod
-    def restore_from_file(cls, name):
-        sess = tf.Session()
-        saver = tf.train.import_meta_graph('%s.meta' % name)
-        saver.restore(sess, name)
-        graph = tf.get_default_graph()
-        num_features = graph.get_tensor_by_name("num_features:0")
-        num_classes = graph.get_tensor_by_name("num_classes:0")
-        return cls(num_features, num_classes, name, graph)
