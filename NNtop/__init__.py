@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 class Layer(object):
-    def __init__(self, name, shape, activation=None):
+    def __init__(self, name, shape, activation=None, dropout=None):
         """
         shape - Layer shape
         activation - current supported: None, 'relu', 'sigmoid', 'tanh'
@@ -12,6 +12,7 @@ class Layer(object):
         self.__W = None
         self.__b = None
         self.__activation = activation
+        self.__dropout = dropout
 
     @property
     def shape(self):
@@ -29,6 +30,8 @@ class Layer(object):
             result = tf.nn.sigmoid(result, name="%s_sigmoid" % self.name)
         elif self.__activation == 'tanh':
             result = tf.nn.tanh(result, name="%s_tanh" % self.name)
+        if self.__dropout:
+            result = tf.nn.dropout(result, self.__dropout, name="%s_dropout" % self.name)
         return result
 
     @property
