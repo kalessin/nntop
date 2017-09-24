@@ -95,6 +95,7 @@ class Relu(object):
 
 class Model(object):
     def __init__(self, name, num_features, num_classes):
+        self.__compiled = False
         graph = None
         if num_features is None or num_classes is None: # restore model mode
             sess = tf.Session()
@@ -109,12 +110,12 @@ class Model(object):
         self.__num_features = num_features
         self.__name = name
 
-        self.__trained = False
         self.__train_loss = self.__valid_loss = None
 
         self.__output = None
         self.__prediction = None
 
+        self.__loss = self.__train_step = None
         self.__accuracy = self.__confusion_matrix = None
         self.__test_accuracy = None
         self.__test_confusion_matrix = None
@@ -166,50 +167,54 @@ class Model(object):
         print_every - print loss value each given number of steps. If None, it will be set to steps / 10
         """
         print_every = print_every or steps // 10
-        if not self.__trained:
-            with self.__graph.as_default():
-                batchX, batchY = next(batches)
+        with self.__graph.as_default():
+            batchX, batchY = next(batches)
 
-                self._compile()
+            self._compile()
 
-                loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.__y, logits=self.__last))
-                train_step = tf.train.AdamOptimizer(1e-4).minimize(loss)
+            init = tf.global_variables_initializer()
+            with tf.Session(graph=self.__graph) as sess:
+                sess.run(init)
+                for i in range(1, steps + 1):
+                    self.__train_loss, _ = sess.run([self.__loss, self.__train_step],
+                                                    feed_dict={self.__X: batchX,
+                                                               self.__y: batchY})
+                    if i % print_every == 0:
+                        self.__valid_loss = self.__loss.eval(feed_dict={self.__X: validation_set[0],
+                                                                        self.__y: validation_set[1]})
+                        print('step %d, train loss %g, validation loss %g' % (i, self.__train_loss, self.__valid_loss))
+                    batchX, batchY = next(batches)
+                self.__test_accuracy = self.__accuracy.eval(feed_dict={self.__X: test_set[0],
+                                                                       self.__y: test_set[1]})
+                print("Test accuracy: %g" % self.__test_accuracy)
+
+                self.__test_confusion_matrix = self.__confusion_matrix.eval(feed_dict={self.__X: test_set[0],
+                                                                                       self.__y: test_set[1]})
+
+                saver = tf.train.Saver()
+                saver.save(sess, self.__name)
+
+    def _compile(self, restore=False):
+        if not self.__compiled:
+            if restore:
+                self.__output = self.__graph.get_tensor_by_name("modeloutput:0")
+                self.__prediction = self.__graph.get_tensor_by_name("modelprediction:0")
+                self.__loss = self.__graph.get_tensor_by_name("modelloss:0")
+                self.__train_step = self.__graph.get_tensor_by_name("modeltrainstep:0")
+                self.__accuracy = self.__graph.get_tensor_by_name("modelaccuracy:0")
+                self.__confusion_matrix = self.__graph.get_tensor_by_name("modelconfusionmatrix:0")
+            else:
+                tf.Variable(self.__last_name, name="last_name")
+                self.__output = tf.nn.softmax(self.__last, name="modeloutput")
+                self.__prediction = tf.argmax(self.__output, 1, name='modelprediction')
+                self.__loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.__y, logits=self.__last), name="modelloss")
+                self.__train_step = tf.train.AdamOptimizer(1e-4).minimize(self.__loss, name='modeltrainstep')
 
                 labels = tf.argmax(self.__y, 1)
                 correct_prediction = tf.equal(self.__prediction, labels)
-                self.__accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-                self.__confusion_matrix = tf.confusion_matrix(labels, self.__prediction, self.__num_classes)
-
-                init = tf.global_variables_initializer()
-                with tf.Session(graph=self.__graph) as sess:
-                    sess.run(init)
-                    for i in range(1, steps + 1):
-                        self.__train_loss, _ = sess.run([loss, train_step], feed_dict={self.__X: batchX,
-                                                                                       self.__y: batchY})
-                        if i % print_every == 0:
-                            self.__valid_loss = loss.eval(feed_dict={self.__X: validation_set[0],
-                                                                     self.__y: validation_set[1]})
-                            print('step %d, train loss %g, validation loss %g' % (i, self.__train_loss, self.__valid_loss))
-                        batchX, batchY = next(batches)
-                    self.__test_accuracy = self.__accuracy.eval(feed_dict={self.__X: test_set[0],
-                                                                           self.__y: test_set[1]})
-                    print("Test accuracy: %g" % self.__test_accuracy)
-
-                    self.__test_confusion_matrix = self.__confusion_matrix.eval(feed_dict={self.__X: test_set[0],
-                                                                                           self.__y: test_set[1]})
-
-                    saver = tf.train.Saver()
-                    saver.save(sess, self.__name)
-            self.__trained = True
-
-    def _compile(self, restore=False):
-        if self.__output is None:
-            if restore:
-                self.__output = self.__graph.get_tensor_by_name("output:0")
-            else:
-                tf.Variable(self.__last_name, name="last_name")
-                self.__output = tf.nn.softmax(self.__last, name="output")
-            self.__prediction = tf.argmax(self.__output, 1)
+                self.__accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='modelaccuracy')
+                self.__confusion_matrix = tf.confusion_matrix(labels, self.__prediction, self.__num_classes, name='modelconfusionmatrix')
+            self.__compiled = True
 
     def output(self, X):
         with self.__graph.as_default():
