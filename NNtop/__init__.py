@@ -49,18 +49,21 @@ class Layer(object):
         return self.__b
 
     def op(self, X):
-        # first convert to vector the input tensor, where only first dimension (number of samples) is conserved
+        # first convert to vector the input tensor, where only first dimension (number of samples)
+        # is conserved
         input_shape = [-1, np.prod([s.value for s in X.shape[1:]])]
         x = tf.reshape(X, input_shape, name="%s_reshape" % self.name)
 
         if self.__shape[0] is None:
             self.__shape = [input_shape[1], self.__shape[1]]
 
-        return tf.add(tf.matmul(x, self.weights_matrix, name="%s_mul" % self.__name), self.bias_vector, name="%s_add" % self.name)
+        return tf.add(tf.matmul(x, self.weights_matrix, name="%s_mul" % self.__name),
+                      self.bias_vector, name="%s_add" % self.name)
 
 
 class Convolution(Layer):
-    def __init__(self, name, img_shape, field_shape, strides_shape, filters, input_channels=1, padding='SAME', activation=None):
+    def __init__(self, name, img_shape, field_shape, strides_shape, filters, input_channels=1,
+                 padding='SAME', activation=None):
         """
         img_shape - input img shape. If not None, input vector will be reshaped to the given shape.
         field_shape - field Height x field Width
@@ -79,8 +82,8 @@ class Convolution(Layer):
         if self.__img_shape is not None:
             X = tf.reshape(X, [-1, self.__img_shape[0], self.__img_shape[1], self.__input_channels],
                            name="%s_reshape" % self.name)
-        return tf.add(tf.nn.conv2d(X, self.weights_matrix, strides=[1, self.__strides_shape[0], self.__strides_shape[1],
-                                                                    1],
+        return tf.add(tf.nn.conv2d(X, self.weights_matrix, strides=[1, self.__strides_shape[0],
+                                                                    self.__strides_shape[1], 1],
                                    padding=self.__padding, name=self.name),
                       self.bias_vector, name="%s_add" % self.name)
 
