@@ -100,6 +100,7 @@ class Model(object):
     def __init__(self, name, num_features, num_classes):
         self.__compiled = False
         self.__train_epochs = 0
+        self.__restored = False
 
         graph = None
         if num_features is None or num_classes is None: # restore model mode
@@ -110,6 +111,7 @@ class Model(object):
             num_features = graph.get_tensor_by_name("num_features:0")
             num_classes = graph.get_tensor_by_name("num_classes:0")
             self.__last_name = str(sess.run(["last_name:0"])[0].decode())
+            self.__restored = True
 
         self.__num_classes = num_classes
         self.__num_features = num_features
@@ -131,7 +133,7 @@ class Model(object):
                 self.__X = self.__graph.get_tensor_by_name("X:0")
                 self.__y = self.__graph.get_tensor_by_name("y:0")
                 self.__last = self.__graph.get_tensor_by_name(self.__last_name)
-                self._compile(restore=True)
+                self._compile()
             else: # we are creating a new model
                 self.__X = tf.placeholder(tf.float32, shape=[None, self.__num_features], name='X')
                 self.__y = tf.placeholder(tf.float32, shape=[None, self.__num_classes], name='y')
@@ -208,9 +210,9 @@ class Model(object):
                 saver = tf.train.Saver()
                 saver.save(sess, self.__name)
 
-    def _compile(self, restore=False):
+    def _compile(self):
         if not self.__compiled:
-            if restore:
+            if self.__restored:
                 self.__output = self.__graph.get_tensor_by_name("model_output:0")
                 self.__prediction = self.__graph.get_tensor_by_name("model_prediction:0")
                 self.__loss = self.__graph.get_tensor_by_name("model_loss:0")
