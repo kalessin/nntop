@@ -99,6 +99,8 @@ class Relu(object):
 class Model(object):
     def __init__(self, name, num_features, num_classes):
         self.__compiled = False
+        self.__train_epochs = 0
+
         graph = None
         if num_features is None or num_classes is None: # restore model mode
             sess = tf.Session()
@@ -141,6 +143,10 @@ class Model(object):
                 self.__last_name = self.__last.name
 
     @property
+    def train_epochs(self):
+        return self.__train_epochs
+
+    @property
     def final_train_loss(self):
         return self.__train_loss
 
@@ -175,9 +181,14 @@ class Model(object):
 
             self._compile()
 
-            init = tf.global_variables_initializer()
             with tf.Session(graph=self.__graph) as sess:
-                sess.run(init)
+                if self.__train_epochs == 0:
+                    init = tf.global_variables_initializer()
+                    sess.run(init)
+                else:
+                    saver = tf.train.import_meta_graph('%s.meta' % self.__name)
+                    saver.restore(sess, self.__name)
+                self.__train_epochs += 1
                 for i in range(1, steps + 1):
                     self.__train_loss, _ = sess.run([self.__loss, self.__train_step],
                                                     feed_dict={self.__X: batchX,
