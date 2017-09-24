@@ -211,23 +211,23 @@ class Model(object):
     def _compile(self, restore=False):
         if not self.__compiled:
             if restore:
-                self.__output = self.__graph.get_tensor_by_name("modeloutput:0")
-                self.__prediction = self.__graph.get_tensor_by_name("modelprediction:0")
-                self.__loss = self.__graph.get_tensor_by_name("modelloss:0")
-                self.__train_step = self.__graph.get_tensor_by_name("modeltrainstep:0")
-                self.__accuracy = self.__graph.get_tensor_by_name("modelaccuracy:0")
-                self.__confusion_matrix = self.__graph.get_tensor_by_name("modelconfusionmatrix:0")
+                self.__output = self.__graph.get_tensor_by_name("model_output:0")
+                self.__prediction = self.__graph.get_tensor_by_name("model_prediction:0")
+                self.__loss = self.__graph.get_tensor_by_name("model_loss:0")
+                self.__train_step = self.__graph.get_tensor_by_name("model_train_step:0")
+                self.__accuracy = self.__graph.get_tensor_by_name("model_accuracy:0")
+                self.__confusion_matrix = self.__graph.get_tensor_by_name("model_confusion_matrix:0")
             else:
                 tf.Variable(self.__last_name, name="last_name")
-                self.__output = tf.nn.softmax(self.__last, name="modeloutput")
-                self.__prediction = tf.argmax(self.__output, 1, name='modelprediction')
-                self.__loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.__y, logits=self.__last), name="modelloss")
-                self.__train_step = tf.train.AdamOptimizer(1e-4).minimize(self.__loss, name='modeltrainstep')
+                self.__output = tf.nn.softmax(self.__last, name="model_output")
+                self.__prediction = tf.argmax(self.__output, 1, name='model_prediction')
+                self.__loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.__y, logits=self.__last), name="model_loss")
+                self.__train_step = tf.train.AdamOptimizer(1e-4).minimize(self.__loss, name='model_train_step')
 
                 labels = tf.argmax(self.__y, 1)
                 correct_prediction = tf.equal(self.__prediction, labels)
-                self.__accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='modelaccuracy')
-                self.__confusion_matrix = tf.confusion_matrix(labels, self.__prediction, self.__num_classes, name='modelconfusionmatrix')
+                self.__accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='model_accuracy')
+                self.__confusion_matrix = tf.confusion_matrix(labels, self.__prediction, self.__num_classes, name='model_confusion_matrix')
             self.__compiled = True
 
     def output(self, X):
