@@ -216,9 +216,9 @@ class Model(object):
                 self.__output = self.__graph.get_tensor_by_name("model_output:0")
                 self.__prediction = self.__graph.get_tensor_by_name("model_prediction:0")
                 self.__loss = self.__graph.get_tensor_by_name("model_loss:0")
-                self.__train_step = self.__graph.get_tensor_by_name("model_train_step:0")
+                self.__train_step = self.__graph.get_operation_by_name("model_train_step")
                 self.__accuracy = self.__graph.get_tensor_by_name("model_accuracy:0")
-                self.__confusion_matrix = self.__graph.get_tensor_by_name("model_confusion_matrix:0")
+                # self.__confusion_matrix = self.__graph.get_tensor_by_name("model_confusion_matrix:0")
             else:
                 tf.Variable(self.__last_name, name="last_name")
                 self.__output = tf.nn.softmax(self.__last, name="model_output")
