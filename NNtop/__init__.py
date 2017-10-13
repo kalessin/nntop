@@ -113,6 +113,7 @@ class Model(object):
         self.__accuracy = self.__confusion_matrix = None
         self.__test_accuracy = None
         self.__test_confusion_matrix = None
+        self.__train_epochs = 0
 
         if num_features is None or num_classes is None: # restore model mode
             sess = tf.Session()
@@ -130,12 +131,12 @@ class Model(object):
                 self.__y = self.__graph.get_tensor_by_name("y:0")
                 self.__last = self.__graph.get_tensor_by_name(self.__last_name)
                 self._compile()
+                self.__train_epochs_t = tf.Variable(self.__train_epochs, name='train_epochs')
         else:
 
             self.__graph = tf.Graph()
             self.__num_classes = num_classes
             self.__num_features = num_features
-            self.__train_epochs = 0
 
             with self.__graph.as_default():
                 self.__X = tf.placeholder(tf.float32, shape=[None, self.__num_features], name='X')
@@ -147,7 +148,7 @@ class Model(object):
                 self.__last = self.__X
                 self.__last_name = self.__last.name
 
-        self.__train_epochs_t = tf.Variable(self.__train_epochs, name='train_epochs')
+                self.__train_epochs_t = tf.Variable(self.__train_epochs, name='train_epochs')
 
     @property
     def train_epochs(self):
