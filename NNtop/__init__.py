@@ -99,23 +99,9 @@ class Relu(object):
 class Model(object):
     def __init__(self, name, num_features, num_classes):
         self.__compiled = False
-        self.__train_epochs = 0
         self.__restored = False
         self.__saver = None
 
-        graph = None
-        if num_features is None or num_classes is None: # restore model mode
-            sess = tf.Session()
-            self.__saver = tf.train.import_meta_graph('%s.meta' % name)
-            self.__saver.restore(sess, name)
-            graph = tf.get_default_graph()
-            num_features = graph.get_tensor_by_name("num_features:0")
-            num_classes = graph.get_tensor_by_name("num_classes:0")
-            self.__last_name = str(sess.run(["last_name:0"])[0].decode())
-            self.__restored = True
-
-        self.__num_classes = num_classes
-        self.__num_features = num_features
         self.__name = name
 
         self.__train_loss = self.__valid_loss = None
@@ -128,14 +114,30 @@ class Model(object):
         self.__test_accuracy = None
         self.__test_confusion_matrix = None
 
-        self.__graph = graph or tf.Graph()
-        with self.__graph.as_default():
-            if graph: # we are restoring model
+        if num_features is None or num_classes is None: # restore model mode
+            sess = tf.Session()
+            self.__saver = tf.train.import_meta_graph('%s.meta' % name)
+            self.__saver.restore(sess, name)
+            self.__graph = tf.get_default_graph()
+            self.__num_features = sess.run(["num_features:0"])[0]
+            self.__num_classes = sess.run(["num_classes:0"])[0]
+            self.__train_epochs = sess.run(["train_epochs:0"])[0]
+            self.__last_name = str(sess.run(["last_name:0"])[0].decode())
+            self.__restored = True
+
+            with self.__graph.as_default():
                 self.__X = self.__graph.get_tensor_by_name("X:0")
                 self.__y = self.__graph.get_tensor_by_name("y:0")
                 self.__last = self.__graph.get_tensor_by_name(self.__last_name)
                 self._compile()
-            else: # we are creating a new model
+        else:
+
+            self.__graph = tf.Graph()
+            self.__num_classes = num_classes
+            self.__num_features = num_features
+            self.__train_epochs = 0
+
+            with self.__graph.as_default():
                 self.__X = tf.placeholder(tf.float32, shape=[None, self.__num_features], name='X')
                 self.__y = tf.placeholder(tf.float32, shape=[None, self.__num_classes], name='y')
 
@@ -144,6 +146,8 @@ class Model(object):
                 tf.constant(self.__num_features, name="num_features")
                 self.__last = self.__X
                 self.__last_name = self.__last.name
+
+        self.__train_epochs_t = tf.Variable(self.__train_epochs, name='train_epochs')
 
     @property
     def train_epochs(self):
@@ -207,6 +211,7 @@ class Model(object):
                 self.__test_confusion_matrix = self.__confusion_matrix.eval(feed_dict={self.__X: test_set[0],
                                                                                        self.__y: test_set[1]})
 
+                self.__train_epochs_t.assign(self.__train_epochs).eval()
                 self._save(sess)
 
     @property
@@ -225,8 +230,9 @@ class Model(object):
                 self.__prediction = self.__graph.get_tensor_by_name("model_prediction:0")
                 self.__loss = self.__graph.get_tensor_by_name("model_loss:0")
                 self.__train_step = self.__graph.get_operation_by_name("model_train_step")
+
+                self.__labels = self.__graph.get_tensor_by_name("model_labels:0")
                 self.__accuracy = self.__graph.get_tensor_by_name("model_accuracy:0")
-                # self.__confusion_matrix = self.__graph.get_tensor_by_name("model_confusion_matrix:0")
             else:
                 tf.Variable(self.__last_name, name="last_name")
                 self.__output = tf.nn.softmax(self.__last, name="model_output")
@@ -234,10 +240,10 @@ class Model(object):
                 self.__loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=self.__y, logits=self.__last), name="model_loss")
                 self.__train_step = tf.train.AdamOptimizer(1e-4).minimize(self.__loss, name='model_train_step')
 
-                labels = tf.argmax(self.__y, 1)
-                correct_prediction = tf.equal(self.__prediction, labels)
+                self.__labels = tf.argmax(self.__y, 1, name='model_labels')
+                correct_prediction = tf.equal(self.__prediction, self.__labels, name='model_correct_prediction')
                 self.__accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32), name='model_accuracy')
-                self.__confusion_matrix = tf.confusion_matrix(labels, self.__prediction, self.__num_classes, name='model_confusion_matrix')
+            self.__confusion_matrix = tf.confusion_matrix(self.__labels, self.__prediction, self.__num_classes, name='model_confusion_matrix')
             self.__compiled = True
 
     def output(self, X):
