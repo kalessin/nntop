@@ -101,12 +101,13 @@ class Model(object):
         self.__compiled = False
         self.__train_epochs = 0
         self.__restored = False
+        self.__saver = None
 
         graph = None
         if num_features is None or num_classes is None: # restore model mode
             sess = tf.Session()
-            saver = tf.train.import_meta_graph('%s.meta' % name)
-            saver.restore(sess, name)
+            self.__saver = tf.train.import_meta_graph('%s.meta' % name)
+            self.__saver.restore(sess, name)
             graph = tf.get_default_graph()
             num_features = graph.get_tensor_by_name("num_features:0")
             num_classes = graph.get_tensor_by_name("num_classes:0")
@@ -188,8 +189,7 @@ class Model(object):
                     init = tf.global_variables_initializer()
                     sess.run(init)
                 else:
-                    saver = tf.train.import_meta_graph('%s.meta' % self.__name)
-                    saver.restore(sess, self.__name)
+                    self.__saver.restore(sess, self.__name)
                 self.__train_epochs += 1
                 for i in range(1, steps + 1):
                     self.__train_loss, _ = sess.run([self.__loss, self.__train_step],
@@ -207,8 +207,16 @@ class Model(object):
                 self.__test_confusion_matrix = self.__confusion_matrix.eval(feed_dict={self.__X: test_set[0],
                                                                                        self.__y: test_set[1]})
 
-                saver = tf.train.Saver()
-                saver.save(sess, self.__name)
+                self._save(sess)
+
+    @property
+    def saver(self):
+        if self.__saver is None:
+            self.__saver = tf.train.Saver()
+        return self.__saver
+
+    def _save(self, sess):
+        self.saver.save(sess, self.__name)
 
     def _compile(self):
         if not self.__compiled:
@@ -235,8 +243,7 @@ class Model(object):
     def output(self, X):
         with self.__graph.as_default():
             with tf.Session(graph=self.__graph) as sess:
-                saver = tf.train.Saver()
-                saver.restore(sess, self.__name)
+                self.saver.restore(sess, self.__name)
                 output, prediction = sess.run([self.__output, self.__prediction], feed_dict={self.__X: X})
                 return output, prediction
 
