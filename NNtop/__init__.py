@@ -151,6 +151,10 @@ class Model(object):
                 self.__train_epochs_t = tf.Variable(self.__train_epochs, name='train_epochs')
 
     @property
+    def graph(self):
+        return self.__graph
+
+    @property
     def train_epochs(self):
         return self.__train_epochs
 
