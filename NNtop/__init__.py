@@ -131,7 +131,7 @@ class Model(object):
                 self.__y = self.__graph.get_tensor_by_name("y:0")
                 self.__last = self.__graph.get_tensor_by_name(self.__last_name)
                 self._compile()
-                self.__train_epochs_t = tf.Variable(self.__train_epochs, name='train_epochs')
+                self.__train_epochs_t = self.__graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, "train_epochs")[0]
         else:
 
             self.__graph = tf.Graph()
