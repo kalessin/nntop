@@ -114,27 +114,29 @@ class Model(object):
         self.__test_accuracy = None
         self.__test_confusion_matrix = None
         self.__train_epochs = 0
+        self.__graph = tf.Graph()
 
         if num_features is None or num_classes is None: # restore model mode
-            sess = tf.Session()
-            self.__saver = tf.train.import_meta_graph('%s.meta' % name)
-            self.__saver.restore(sess, name)
-            self.__graph = tf.get_default_graph()
-            self.__num_features = sess.run(["num_features:0"])[0]
-            self.__num_classes = sess.run(["num_classes:0"])[0]
-            self.__train_epochs = sess.run(["train_epochs:0"])[0]
-            self.__last_name = str(sess.run(["last_name:0"])[0].decode())
-            self.__restored = True
-
             with self.__graph.as_default():
-                self.__X = self.__graph.get_tensor_by_name("X:0")
-                self.__y = self.__graph.get_tensor_by_name("y:0")
-                self.__last = self.__graph.get_tensor_by_name(self.__last_name)
-                self._compile()
-                self.__train_epochs_t = self.__graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, "train_epochs")[0]
+
+                with  tf.Session(graph=self.__graph) as sess:
+                    self.__saver = tf.train.import_meta_graph('%s.meta' % name)
+                    self.__saver.restore(sess, name)
+
+                    self.__X = self.__graph.get_tensor_by_name("X:0")
+                    self.__y = self.__graph.get_tensor_by_name("y:0")
+                    self.__train_epochs_t = self.__graph.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, "train_epochs")[0]
+
+                    self.__num_features = sess.run(["num_features:0"])[0]
+                    self.__num_classes = sess.run(["num_classes:0"])[0]
+                    self.__train_epochs = sess.run(["train_epochs:0"])[0]
+                    self.__last_name = str(sess.run(["last_name:0"])[0].decode())
+                    self.__restored = True
+                    self.__last = self.__graph.get_tensor_by_name(self.__last_name)
+                    self._compile()
+           
         else:
 
-            self.__graph = tf.Graph()
             self.__num_classes = num_classes
             self.__num_features = num_features
 
