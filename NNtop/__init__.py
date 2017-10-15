@@ -62,24 +62,28 @@ class Layer(object):
 
 
 class Convolution(Layer):
-    def __init__(self, name, img_shape, field_shape, strides_shape, filters, input_channels=1,
+    def __init__(self, name, img_shape, field_shape, strides_shape, filters,
                  padding='SAME', activation=None):
         """
-        img_shape - input img shape. If not None, input vector will be reshaped to the given shape.
+        input_shape - A 3-element tuple containing:
+                     - the number of image input channels
+                     - the height of input image
+                     - the width of input image
+                     The first number is always required. The other two can be None. In this case, input must already come
+                     in the correct shape. If not None, input is reshaped to the provided shape.
         field_shape - field Height x field Width
         strides_shape - strides Height x strides Width
         filters - number of filters
-        input_channels - number of input channels
         padding - padding type
         """
-        super(Convolution, self).__init__(name, [field_shape[0], field_shape[1], input_channels, filters], activation=activation)
         self.__strides_shape = strides_shape
-        self.__img_shape = img_shape
-        self.__input_channels = input_channels
+        self.__input_channels = img_shape[0]
+        self.__img_shape = img_shape[1:]
         self.__padding = padding
+        super(Convolution, self).__init__(name, [field_shape[0], field_shape[1], self.__input_channels, filters], activation=activation)
 
     def op(self, X):
-        if self.__img_shape is not None:
+        if all(self.__img_shape):
             X = tf.reshape(X, [-1, self.__img_shape[0], self.__img_shape[1], self.__input_channels],
                            name="%s_reshape" % self.name)
         return tf.add(tf.nn.conv2d(X, self.weights_matrix, strides=[1, self.__strides_shape[0],
