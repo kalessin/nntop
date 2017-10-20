@@ -6,6 +6,7 @@ class Layer(object):
         """
         shape - Layer shape
         activation - current supported: None, 'relu', 'sigmoid', 'tanh'
+        dropout - A float between 0.0 and 1.0. Specifies proobability of layer units dropout.
         """
         self.__name = name
         self.__shape = shape
@@ -31,7 +32,7 @@ class Layer(object):
         elif self.__activation == 'tanh':
             result = tf.nn.tanh(result, name="%s_tanh" % self.name)
         if self.__dropout:
-            result = tf.nn.dropout(result, self.__dropout, name="%s_dropout" % self.name)
+            result = tf.nn.dropout(result, 1 - self.__dropout, name="%s_dropout" % self.name)
         return result
 
     @property
