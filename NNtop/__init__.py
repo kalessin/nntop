@@ -63,7 +63,7 @@ class Layer(object):
 
 class Convolution(Layer):
     def __init__(self, name, img_shape, field_shape, strides_shape, filters,
-                 padding='SAME', activation=None):
+                 padding='SAME', max_pool=None, activation=None):
         """
         input_shape - A 3-element tuple containing:
                      - the number of image input channels
@@ -75,21 +75,28 @@ class Convolution(Layer):
         strides_shape - strides Height x strides Width
         filters - number of filters
         padding - padding type
+        max_pool - A 2-epement tuple defining a 2d max pool
         """
         self.__strides_shape = strides_shape
         self.__input_channels = img_shape[0]
         self.__img_shape = img_shape[1:]
         self.__padding = padding
+        self.__max_pool = max_pool
         super(Convolution, self).__init__(name, [field_shape[0], field_shape[1], self.__input_channels, filters], activation=activation)
 
     def op(self, X):
         if all(self.__img_shape):
             X = tf.reshape(X, [-1, self.__img_shape[0], self.__img_shape[1], self.__input_channels],
                            name="%s_reshape" % self.name)
-        return tf.add(tf.nn.conv2d(X, self.weights_matrix, strides=[1, self.__strides_shape[0],
+        result = tf.add(tf.nn.conv2d(X, self.weights_matrix, strides=[1, self.__strides_shape[0],
                                                                     self.__strides_shape[1], 1],
                                    padding=self.__padding, name=self.name),
                       self.bias_vector, name="%s_add" % self.name)
+        if self.__max_pool is not None:
+            result = tf.nn.max_pool(result, ksize=[1, self.__max_pool[0], self.__max_pool[1], 1],
+                                    strides=[1, self.__max_pool[0], self.__max_pool[1], 1], padding='SAME',
+                                    name="%s_maxpool" % self.name)
+        return result
 
 
 class Relu(object):
