@@ -214,7 +214,7 @@ class Model(object):
                 else:
                     self.__saver.restore(sess, self.__name)
                 self.__train_epochs += 1
-                print("Starting training epoch %d", self.__train_epochs)
+                print("Starting training epoch", self.__train_epochs)
                 for i in range(1, steps + 1):
                     self.__train_loss, _ = sess.run([self.__loss, self.__train_step],
                                                     feed_dict={self.__X: batchX,
