@@ -63,7 +63,7 @@ class Layer(object):
 
 
 class Convolution(Layer):
-    def __init__(self, name, img_shape, field_shape, strides_shape, filters,
+    def __init__(self, name, input_shape, field_shape, strides_shape, filters,
                  padding='SAME', max_pool=None, activation=None):
         """
         input_shape - A 3-element tuple containing:
@@ -79,8 +79,8 @@ class Convolution(Layer):
         max_pool - A 2-epement tuple defining a 2d max pool
         """
         self.__strides_shape = strides_shape
-        self.__input_channels = img_shape[0]
-        self.__img_shape = img_shape[1:]
+        self.__input_channels = input_shape[0]
+        self.__img_shape = input_shape[1:]
         self.__padding = padding
         self.__max_pool = max_pool
         super(Convolution, self).__init__(name, [field_shape[0], field_shape[1], self.__input_channels, filters], activation=activation)
