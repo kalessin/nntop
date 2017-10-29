@@ -188,6 +188,10 @@ class Model(object):
     def final_test_confusion_matrix(self):
         return self.__test_confusion_matrix
 
+    @property
+    def last(self):
+        return self.__last
+
     def append(self, tensor_op):
         with self.__graph.as_default():
             self.__last = tensor_op(self.__last)
